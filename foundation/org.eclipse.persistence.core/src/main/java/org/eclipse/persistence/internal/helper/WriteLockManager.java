@@ -532,10 +532,18 @@ public class WriteLockManager {
      * within this class this method will lock only this object.
      */
     public CacheKey appendLock(Object primaryKey, Object objectToLock, ClassDescriptor descriptor, MergeManager mergeManager, AbstractSession session) {
+        String threadName = Thread.currentThread().getName();
+        System.out.println("[LOCK-DEBUG] " + threadName + " - Attempting to acquire lock for: " + primaryKey);
+
         CacheKey lockedCacheKey = session.getIdentityMapAccessorInstance().acquireLockNoWait(primaryKey, descriptor.getJavaClass(), false, descriptor);
+
         if (lockedCacheKey == null) {
+            // LOCK CONTENTION PATH - Could not acquire immediately
+            System.out.println("[LOCK-DEBUG] " + threadName + " - Lock contention detected! Transitioning to deferred locks for: " + primaryKey);
             session.getIdentityMapAccessorInstance().getWriteLockManager().transitionToDeferredLocks(mergeManager);
             lockedCacheKey = session.getIdentityMapAccessorInstance().acquireDeferredLock(primaryKey, descriptor.getJavaClass(), descriptor, true);
+            System.out.println("[LOCK-DEBUG] " + threadName + " - Acquired deferred lock for: " + primaryKey);
+
             Object cachedObject = lockedCacheKey.getObject();
             if (cachedObject == null) {
                 if (lockedCacheKey.getActiveThread() == Thread.currentThread()) {
@@ -547,15 +555,23 @@ public class WriteLockManager {
             lockedCacheKey.releaseDeferredLock();
             return lockedCacheKey;
         } else {
+            // LOCK ACQUIRED IMMEDIATELY
+            System.out.println("[LOCK-DEBUG] " + threadName + " - Lock acquired immediately for: " + primaryKey);
+
             if (lockedCacheKey.getObject() == null) {
-                lockedCacheKey.setObject(objectToLock); // set the object in the
-                // cachekey
-                // for others to find an prevent cycles
+                lockedCacheKey.setObject(objectToLock);
             }
-            if (mergeManager.isTransitionedToDeferredLocks()){
-                ConcurrencyManager.getDeferredLockManager(Thread.currentThread()).getActiveLocks().add(lockedCacheKey);
+
+            // TRACK LOCK STORAGE
+            if (true || mergeManager.isTransitionedToDeferredLocks()){
+                System.out.println("[LOCK-DEBUG] " + threadName + " - Storing lock in DeferredLockManager for: " + primaryKey);
+                DeferredLockManager deferredLockManager = ConcurrencyManager.getDeferredLockManager(Thread.currentThread());
+                deferredLockManager.getActiveLocks().add(lockedCacheKey);
+                System.out.println("[LOCK-DEBUG] " + threadName + " - DeferredLockManager now has " + deferredLockManager.getActiveLocks().size() + " locks");
             }else{
-                 mergeManager.getAcquiredLocks().add(lockedCacheKey);
+                System.out.println("[LOCK-DEBUG] " + threadName + " - Storing lock in mergeManager for: " + primaryKey);
+                mergeManager.getAcquiredLocks().add(lockedCacheKey);
+                System.out.println("[LOCK-DEBUG] " + threadName + " - MergeManager now has " + mergeManager.getAcquiredLocks().size() + " locks");
             }
             return lockedCacheKey;
         }
