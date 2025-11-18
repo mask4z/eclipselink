@@ -33,6 +33,8 @@ import org.eclipse.persistence.internal.sessions.AbstractSession;
 import org.eclipse.persistence.internal.sessions.MergeManager;
 import org.eclipse.persistence.internal.sessions.ObjectChangeSet;
 import org.eclipse.persistence.internal.sessions.UnitOfWorkChangeSet;
+import org.eclipse.persistence.logging.AbstractSessionLog;
+import org.eclipse.persistence.logging.LogLevel;
 import org.eclipse.persistence.logging.SessionLog;
 import org.eclipse.persistence.mappings.DatabaseMapping;
 
@@ -552,10 +554,37 @@ public class WriteLockManager {
                 // cachekey
                 // for others to find an prevent cycles
             }
-            if (mergeManager.isTransitionedToDeferredLocks()){
-                ConcurrencyManager.getDeferredLockManager(Thread.currentThread()).getActiveLocks().add(lockedCacheKey);
-            }else{
-                 mergeManager.getAcquiredLocks().add(lockedCacheKey);
+            if (mergeManager.isTransitionedToDeferredLocks()) {
+                DeferredLockManager deferredLockManager = ConcurrencyManager.getDeferredLockManager(Thread.currentThread());
+                if (deferredLockManager != null) {
+                    deferredLockManager.getActiveLocks().add(lockedCacheKey);
+                    if (AbstractSessionLog.getLog().shouldLog(SessionLog.FINER, SessionLog.CACHE)) {
+                        Object entity = lockedCacheKey.getObject();
+                        String entityClass = (entity != null) ? entity.getClass().getSimpleName() : "null";
+                        AbstractSessionLog.getLog().log(SessionLog.FINER, SessionLog.CACHE,
+                                "[DEADLOCK-DEBUG] Lock added to DeferredLockManager | Thread: {0} | Entity: {1} | PK: {2}",
+                                new Object[]{Thread.currentThread().getName(), entityClass, lockedCacheKey.getKey()});
+                    }
+
+                } else {
+                    mergeManager.getAcquiredLocks().add(lockedCacheKey);
+                    if (AbstractSessionLog.getLog().shouldLog(SessionLog.WARNING, SessionLog.CACHE)) {
+                        Object entity = lockedCacheKey.getObject();
+                        String entityClass = (entity != null) ? entity.getClass().getSimpleName() : "null";
+                        AbstractSessionLog.getLog().log(SessionLog.WARNING, SessionLog.CACHE,
+                                "[DEADLOCK-DEBUG] DeferredLockManager NULL - using fallback | Thread: {0} | Entity: {1} | PK: {2}",
+                                new Object[]{Thread.currentThread().getName(), entityClass, lockedCacheKey.getKey()});
+                    }
+                }
+            } else {
+                mergeManager.getAcquiredLocks().add(lockedCacheKey);
+                if (AbstractSessionLog.getLog().shouldLog(SessionLog.FINER, SessionLog.CACHE)) {
+                    Object entity = lockedCacheKey.getObject();
+                    String entityClass = (entity != null) ? entity.getClass().getSimpleName() : "null";
+                    AbstractSessionLog.getLog().log(SessionLog.FINER, SessionLog.CACHE,
+                            "[DEADLOCK-DEBUG] cacheKey loaded to Active Locks | Thread: {0} | Entity: {1} | CacheKey: {2}",
+                            new Object[]{Thread.currentThread().getName(), entityClass, lockedCacheKey});
+                }
             }
             return lockedCacheKey;
         }

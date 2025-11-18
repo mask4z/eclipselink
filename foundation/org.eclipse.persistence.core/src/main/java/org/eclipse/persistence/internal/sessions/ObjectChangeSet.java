@@ -31,7 +31,10 @@ import org.eclipse.persistence.internal.core.helper.CoreClassConstants;
 import org.eclipse.persistence.internal.descriptors.OptimisticLockingPolicy;
 import org.eclipse.persistence.internal.helper.ClassConstants;
 import org.eclipse.persistence.internal.identitymaps.CacheKey;
+import org.eclipse.persistence.logging.AbstractSessionLog;
+import org.eclipse.persistence.logging.LogLevel;
 import org.eclipse.persistence.logging.SessionLog;
+import org.eclipse.persistence.logging.SessionLogEntry;
 import org.eclipse.persistence.mappings.DatabaseMapping;
 import org.eclipse.persistence.mappings.foundation.AbstractDirectMapping;
 import org.eclipse.persistence.queries.FetchGroup;
@@ -518,6 +521,11 @@ public class ObjectChangeSet implements Serializable, Comparable<ObjectChangeSet
         }
         CacheKey cacheKey = session.getIdentityMapAccessorInstance().getCacheKeyForObject(primaryKey, descriptor.getJavaClass(), descriptor, true);
         if (cacheKey != null) {
+            if (AbstractSessionLog.getLog().shouldLog(SessionLog.FINER, SessionLog.CACHE)) {
+                AbstractSessionLog.getLog().log(SessionLog.FINER, SessionLog.CACHE,
+                    "[DEADLOCK-DEBUG] CacheKey exists for merge | Thread: {0} | CacheKey: {1}",
+                    new Object[]{Thread.currentThread().getName(), cacheKey});
+            }
             if (cacheKey.acquireReadLockNoWait()) {
                 domainObject = cacheKey.getObject();
                 cacheKey.releaseReadLock();

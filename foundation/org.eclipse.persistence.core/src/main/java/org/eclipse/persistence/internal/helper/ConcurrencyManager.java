@@ -425,7 +425,15 @@ public class ConcurrencyManager implements Serializable {
      * Return the deferred lock manager from the thread
      */
     public static DeferredLockManager getDeferredLockManager(Thread thread) {
-        return getDeferredLockManagers().get(thread);
+        DeferredLockManager manager = getDeferredLockManagers().get(thread);
+        if (manager == null) {
+            if (AbstractSessionLog.getLog().shouldLog(SessionLog.WARNING, SessionLog.CACHE)) {
+                AbstractSessionLog.getLog().log(SessionLog.WARNING, SessionLog.CACHE,
+                    "[DEADLOCK-DEBUG] getDeferredLockManager returned NULL | Thread: {0}",
+                    new Object[]{thread.getName()});
+            }
+        }
+        return manager;
     }
 
     /**
@@ -733,6 +741,20 @@ public class ConcurrencyManager implements Serializable {
                     clearJustificationWhyMethodIsBuildingObjectCompleteReturnsFalse();
                 }
                 throw error;
+            } catch (Exception ex) {
+                AbstractSessionLog.getLog().logThrowable(SessionLog.SEVERE, SessionLog.CACHE, ex);
+                if (AbstractSessionLog.getLog().shouldLog(SessionLog.WARNING, SessionLog.CACHE)) {
+                    AbstractSessionLog.getLog().log(SessionLog.WARNING, SessionLog.CACHE,
+                            "[DEADLOCK-DEBUG] : Exception was caught instead of error, " +
+                            "therefore releaseAllLocksAcquiredByThread(lockManager); is never invoked for Thread: {0} " +
+                            "| deferredLockManager for thread: {1} " +
+                            "| active, and deferred locks: [activeLocks: {2}; deferredLocks: {3}",
+                            new Object[]{Thread.currentThread().getName(),
+                                    lockManager,
+                                    lockManager.getActiveLocks(),
+                                    lockManager.getDeferredLocks()});
+                }
+                throw ex;
             }
         }
     }
