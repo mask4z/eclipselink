@@ -568,13 +568,11 @@ public class WriteLockManager {
 
                 } else {
                     mergeManager.getAcquiredLocks().add(lockedCacheKey);
-                    if (AbstractSessionLog.getLog().shouldLog(SessionLog.WARNING, SessionLog.CACHE)) {
-                        Object entity = lockedCacheKey.getObject();
-                        String entityClass = (entity != null) ? entity.getClass().getSimpleName() : "null";
-                        AbstractSessionLog.getLog().log(SessionLog.WARNING, SessionLog.CACHE,
-                                "[DEADLOCK-DEBUG] DeferredLockManager NULL - using fallback | Thread: {0} | Entity: {1} | PK: {2}",
-                                new Object[]{Thread.currentThread().getName(), entityClass, lockedCacheKey.getKey()});
-                    }
+                    Object entity = lockedCacheKey.getObject();
+                    String entityClass = (entity != null) ? entity.getClass().getSimpleName() : "null";
+                    AbstractSessionLog.getLog().log(SessionLog.SEVERE, SessionLog.CACHE,
+                            "[DEADLOCK-DEBUG] (would have thrown NPE here and cause Dead Lock) DeferredLockManager NULL - using fallback | Thread: {0} | Entity: {1} | PK: {2}",
+                            new Object[]{Thread.currentThread().getName(), entityClass, lockedCacheKey.getKey()});
                 }
             } else {
                 mergeManager.getAcquiredLocks().add(lockedCacheKey);
