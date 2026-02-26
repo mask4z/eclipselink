@@ -230,6 +230,7 @@
                         </goals>
                         <configuration>
                             <instructions>
+                                <Bundle-Version>4.0.0.M3_payara-p1_fix-2376</Bundle-Version>
                                 <Export-Package>
                                     org.eclipse.persistence.internal.cache,
                                     org.eclipse.persistence.internal.codegen,
